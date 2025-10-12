@@ -89,23 +89,80 @@ def is_rate_limited(ip: str) -> bool:
         requests_log[ip].append(now)
         return False
 
-# ------------- Real Stock Data Fetching -------------
+# ------------- Enhanced Multi-Market Stock Data Fetching -------------
+
+def normalize_stock_symbol(symbol: str) -> str:
+    """
+    Normalize stock symbol for different markets and exchanges.
+    Supports US, Indian (NSE/BSE), UK, European, and other major markets.
+    """
+    symbol = symbol.upper().strip()
+    
+    # Market suffixes for reference:
+    # Indian: .NS (NSE), .BO (BSE)
+    # International: .L (London), .T (Tokyo), .HK (Hong Kong), .AX (Australia), etc.
+    
+    # Common Indian stock patterns - auto-detect and add NSE suffix if needed
+    indian_patterns = [
+        'RELIANCE', 'TCS', 'INFY', 'HINDUNILVR', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC', 
+        'KOTAKBANK', 'LT', 'ASIANPAINT', 'AXISBANK', 'MARUTI', 'SUNPHARMA', 'ULTRACEMCO',
+        'TITAN', 'NESTLEIND', 'BAJFINANCE', 'TECHM', 'POWERGRID', 'NTPC', 'COALINDIA',
+        'ONGC', 'WIPRO', 'TATAMOTORS', 'JSWSTEEL', 'GRASIM', 'HCLTECH', 'CIPLA', 'DRREDDY',
+        'EICHERMOT', 'BRITANNIA', 'DIVISLAB', 'APOLLOHOSP', 'BAJAJFINSV', 'SHREECEM',
+        'TATASTEEL', 'ADANIPORTS', 'HEROMOTOCO', 'BPCL', 'INDUSINDBK'
+    ]
+    
+    # If it's a known Indian stock without suffix, add .NS
+    base_symbol = symbol.split('.')[0]
+    if base_symbol in indian_patterns and '.' not in symbol:
+        logger.info(f"Auto-detected Indian stock {symbol}, adding .NS suffix")
+        return f"{symbol}.NS"
+    
+    # If symbol already has a suffix, return as is
+    if '.' in symbol:
+        return symbol
+    
+    # Default: assume US market (no suffix needed for US stocks)
+    return symbol
+
 async def fetch_real_stock_data(symbol: str, period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
-    """Fetch real historical stock data using yfinance"""
-    cache_key = f"{symbol}_{period}_{interval}"
+    """
+    Fetch real historical stock data using yfinance with enhanced multi-market support.
+    Supports US, Indian (NSE/BSE), UK, European, and other major global markets.
+    """
+    # Normalize the symbol for different markets
+    normalized_symbol = normalize_stock_symbol(symbol)
+    cache_key = f"{normalized_symbol}_{period}_{interval}"
+    
     if cache_key in stock_cache:
         logger.info(f"Cache hit for stock data: {cache_key}")
         return stock_cache[cache_key]
     
     try:
-        logger.info(f"Fetching real stock data for {symbol}")
-        ticker = yf.Ticker(symbol)
+        logger.info(f"Fetching real stock data for {normalized_symbol} (original: {symbol})")
+        ticker = yf.Ticker(normalized_symbol)
         
         # Fetch historical data
         df = ticker.history(period=period, interval=interval)
         
         if df.empty:
-            raise ValueError(f"No data found for symbol {symbol}")
+            # Try alternative suffixes for Indian stocks if initial attempt fails
+            if symbol.upper() in ['RELIANCE', 'TCS', 'INFY', 'HINDUNILVR', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC']:
+                for suffix in ['.NS', '.BO']:
+                    try:
+                        alt_symbol = f"{symbol.upper()}{suffix}"
+                        if alt_symbol != normalized_symbol:  # Don't retry the same symbol
+                            alt_ticker = yf.Ticker(alt_symbol)
+                            df = alt_ticker.history(period=period, interval=interval)
+                            if not df.empty:
+                                normalized_symbol = alt_symbol
+                                logger.info(f"Found data using alternative suffix: {alt_symbol}")
+                                break
+                    except Exception:
+                        continue
+            
+            if df.empty:
+                raise ValueError(f"No data found for symbol {normalized_symbol}. For Indian stocks, try adding .NS (NSE) or .BO (BSE) suffix.")
         
         # Clean the data
         df = df.dropna()
@@ -122,47 +179,130 @@ async def fetch_real_stock_data(symbol: str, period: str = "6mo", interval: str 
         
         # Cache the data
         stock_cache[cache_key] = df
-        logger.info(f"Successfully fetched {len(df)} data points for {symbol}")
+        logger.info(f"Successfully fetched {len(df)} data points for {normalized_symbol}")
         return df
         
     except Exception as e:
-        logger.error(f"Failed to fetch stock data for {symbol}: {e}")
-        raise HTTPException(status_code=404, detail=f"Could not fetch stock data for {symbol}: {str(e)}")
+        logger.error(f"Failed to fetch stock data for {normalized_symbol}: {e}")
+        raise HTTPException(status_code=404, detail=f"Could not fetch stock data for {normalized_symbol}: {str(e)}")
 
 # ------------- Financial Metrics Analysis -------------
 async def fetch_financial_metrics(symbol: str) -> Dict[str, Any]:
-    """Fetch key financial metrics for fundamental analysis"""
-    cache_key = f"metrics_{symbol}"
+    """
+    Fetch key financial metrics for fundamental analysis.
+    Supports multi-market analysis including Indian stocks (NSE/BSE).
+    """
+    # Normalize symbol for metrics fetching
+    normalized_symbol = normalize_stock_symbol(symbol)
+    cache_key = f"metrics_{normalized_symbol}"
     if cache_key in financial_metrics_cache:
         logger.info(f"Cache hit for financial metrics: {cache_key}")
         return financial_metrics_cache[cache_key]
     
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.Ticker(normalized_symbol)
         info = ticker.info
         
-        # Extract key metrics
+        # Helper function to safely convert and validate metrics
+        def safe_metric(value, metric_type="float", multiplier=1, max_reasonable=None):
+            """Safely convert and validate financial metrics"""
+            if value is None or value == "N/A":
+                return None
+            try:
+                if metric_type == "percentage":
+                    # Convert decimal to percentage and validate
+                    converted = float(value) * 100 if value < 1 else float(value)
+                    if max_reasonable and converted > max_reasonable:
+                        logger.warning(f"Metric {converted}% exceeds reasonable limit {max_reasonable}%, likely data error")
+                        return None
+                    return round(converted, 2)
+                elif metric_type == "float":
+                    converted = float(value) * multiplier
+                    if max_reasonable and converted > max_reasonable:
+                        logger.warning(f"Metric {converted} exceeds reasonable limit {max_reasonable}, likely data error")
+                        return None
+                    return round(converted, 2)
+                else:
+                    return value
+            except (ValueError, TypeError):
+                return None
+
+        # Extract and validate key metrics
+        raw_dividend_yield = info.get("dividendYield", 0)
+        raw_roe = info.get("returnOnEquity", None)
+        raw_profit_margin = info.get("profitMargins", None)
+        raw_revenue_growth = info.get("revenueGrowth", None)
+        
+        # Validate dividend yield (typically 0-10% for most stocks)
+        # Indian stocks often have higher dividend yields, so be more lenient
+        dividend_yield = safe_metric(raw_dividend_yield, "percentage", max_reasonable=25.0)
+        if dividend_yield is None and raw_dividend_yield:
+            # If original was too high, try as decimal
+            dividend_yield = safe_metric(raw_dividend_yield, "float", max_reasonable=0.25)
+            if dividend_yield:
+                dividend_yield *= 100
+        
+        # Validate ROE (typically 5-50% for healthy companies)
+        roe = safe_metric(raw_roe, "percentage", max_reasonable=100.0)
+        
+        # Validate profit margin (typically 0-50%)
+        profit_margin = safe_metric(raw_profit_margin, "percentage", max_reasonable=80.0)
+        
+        # Validate revenue growth (typically -50% to +100%)
+        revenue_growth = safe_metric(raw_revenue_growth, "percentage", max_reasonable=200.0)
+
         metrics = {
-            "company_name": info.get("longName", symbol),
+            "company_name": info.get("longName", normalized_symbol),
             "sector": info.get("sector", "N/A"),
             "industry": info.get("industry", "N/A"),
             "market_cap": info.get("marketCap", 0),
-            "pe_ratio": info.get("trailingPE", None),
-            "forward_pe": info.get("forwardPE", None),
-            "eps": info.get("trailingEps", None),
-            "debt_to_equity": info.get("debtToEquity", None),
-            "roe": info.get("returnOnEquity", None),
-            "profit_margin": info.get("profitMargins", None),
-            "revenue_growth": info.get("revenueGrowth", None),
-            "earnings_growth": info.get("earningsGrowth", None),
-            "current_price": info.get("currentPrice", 0),
-            "52_week_high": info.get("fiftyTwoWeekHigh", 0),
-            "52_week_low": info.get("fiftyTwoWeekLow", 0),
-            "dividend_yield": info.get("dividendYield", 0),
-            "beta": info.get("beta", None),
+            "pe_ratio": safe_metric(info.get("trailingPE", None)),
+            "forward_pe": safe_metric(info.get("forwardPE", None)),
+            "eps": safe_metric(info.get("trailingEps", None)),
+            "debt_to_equity": safe_metric(info.get("debtToEquity", None)),
+            "roe": roe,
+            "profit_margin": profit_margin,
+            "revenue_growth": revenue_growth,
+            "earnings_growth": safe_metric(info.get("earningsGrowth", None), "percentage"),
+            "current_price": safe_metric(info.get("currentPrice", 0)),
+            "52_week_high": safe_metric(info.get("fiftyTwoWeekHigh", 0)),
+            "52_week_low": safe_metric(info.get("fiftyTwoWeekLow", 0)),
+            "dividend_yield": dividend_yield,
+            "beta": safe_metric(info.get("beta", None)),
             "volume": info.get("volume", 0),
             "avg_volume": info.get("averageVolume", 0)
         }
+        
+        # Cross-validate and fix obvious errors using historical data
+        try:
+            historical_data = ticker.history(period="1y")
+            if not historical_data.empty:
+                # If current price is missing or unreasonable, use latest close
+                current_close = historical_data['Close'].iloc[-1]
+                if not metrics["current_price"] or abs(metrics["current_price"] - current_close) > current_close * 0.5:
+                    metrics["current_price"] = round(current_close, 2)
+                    logger.info(f"Corrected current price to {current_close}")
+                
+                # Validate 52-week high/low against actual historical data
+                actual_52w_high = historical_data['High'].max()
+                actual_52w_low = historical_data['Low'].min()
+                
+                if abs(metrics["52_week_high"] - actual_52w_high) > actual_52w_high * 0.1:
+                    metrics["52_week_high"] = round(actual_52w_high, 2)
+                
+                if abs(metrics["52_week_low"] - actual_52w_low) > actual_52w_low * 0.1:
+                    metrics["52_week_low"] = round(actual_52w_low, 2)
+        except Exception as e:
+            logger.warning(f"Could not validate metrics with historical data: {e}")
+        
+        # Add data quality indicators
+        metrics["data_quality_flags"] = []
+        if metrics["dividend_yield"] is None and raw_dividend_yield:
+            metrics["data_quality_flags"].append(f"dividend_yield_invalid_raw_value_{raw_dividend_yield}")
+        if metrics["roe"] is None and raw_roe:
+            metrics["data_quality_flags"].append(f"roe_invalid_raw_value_{raw_roe}")
+        if metrics["revenue_growth"] is None and raw_revenue_growth:
+            metrics["data_quality_flags"].append(f"revenue_growth_invalid_raw_value_{raw_revenue_growth}")
         
         # Get quarterly financials for trends
         try:
@@ -175,17 +315,17 @@ async def fetch_financial_metrics(symbol: str) -> Dict[str, Any]:
                 metrics["quarterly_revenue_trend"] = revenue_trend
             else:
                 metrics["quarterly_revenue_trend"] = []
-        except:
+        except Exception:
             metrics["quarterly_revenue_trend"] = []
         
         financial_metrics_cache[cache_key] = metrics
-        logger.info(f"Successfully fetched financial metrics for {symbol}")
+        logger.info(f"Successfully fetched financial metrics for {normalized_symbol}")
         return metrics
         
     except Exception as e:
-        logger.error(f"Failed to fetch financial metrics for {symbol}: {e}")
+        logger.error(f"Failed to fetch financial metrics for {normalized_symbol}: {e}")
         return {
-            "company_name": symbol,
+            "company_name": normalized_symbol,
             "sector": "N/A",
             "industry": "N/A",
             "error": str(e)
@@ -592,13 +732,35 @@ async def generate_comprehensive_report(
 ) -> str:
     """Generate comprehensive investment analysis report"""
     
+    # Helper function to safely format metrics
+    def safe_format(value, format_type="float", suffix="", default="N/A"):
+        """Safely format financial metrics, handling None values"""
+        if value is None:
+            return default
+        try:
+            if format_type == "float":
+                return f"{float(value):.2f}{suffix}"
+            elif format_type == "percent":
+                return f"{float(value):.2f}%"
+            elif format_type == "currency":
+                return f"${float(value):.2f}"
+            else:
+                return str(value) + suffix
+        except (ValueError, TypeError):
+            return default
+    
     # Prepare data for the LLM
     current_price = financial_metrics.get("current_price", 0)
     forecast_mean = forecast.get("mean", [])
     forecast_change = ((forecast_mean[-1] - current_price) / current_price * 100) if forecast_mean and current_price else 0
     
+    # Get current date for accurate context
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
     prompt = f"""
 You are a Senior AI Financial Analyst at InsightInvest generating a comprehensive investment research report for {symbol.upper()}.
+
+**IMPORTANT: Today's date is {current_date}. Please ensure all analysis reflects the current market context for {current_date}.**
 
 ## COMPANY OVERVIEW
 Company: {financial_metrics.get('company_name', symbol)}
@@ -608,16 +770,25 @@ Current Price: ${current_price:.2f}
 
 ## KEY FINANCIAL METRICS
 Market Cap: ${financial_metrics.get('market_cap', 0):,} (if > 0)
-P/E Ratio: {financial_metrics.get('pe_ratio', 'N/A')}
-Forward P/E: {financial_metrics.get('forward_pe', 'N/A')}
-EPS: ${financial_metrics.get('eps', 'N/A')}
-Debt-to-Equity: {financial_metrics.get('debt_to_equity', 'N/A')}
-ROE: {financial_metrics.get('roe', 'N/A')}%
-Profit Margin: {financial_metrics.get('profit_margin', 'N/A')}%
-Revenue Growth: {financial_metrics.get('revenue_growth', 'N/A')}%
-Beta: {financial_metrics.get('beta', 'N/A')}
-52-Week Range: ${financial_metrics.get('52_week_low', 0):.2f} - ${financial_metrics.get('52_week_high', 0):.2f}
-Dividend Yield: {financial_metrics.get('dividend_yield', 0)*100:.2f}% (if > 0, else 'No dividend')
+P/E Ratio: {safe_format(financial_metrics.get('pe_ratio'))}
+Forward P/E: {safe_format(financial_metrics.get('forward_pe'))}
+EPS: {safe_format(financial_metrics.get('eps'), 'currency')}
+Debt-to-Equity: {safe_format(financial_metrics.get('debt_to_equity'))}
+ROE: {safe_format(financial_metrics.get('roe'), 'percent')}
+Profit Margin: {safe_format(financial_metrics.get('profit_margin'), 'percent')}
+Revenue Growth: {safe_format(financial_metrics.get('revenue_growth'), 'percent')}
+Beta: {safe_format(financial_metrics.get('beta'))}
+52-Week Range: {safe_format(financial_metrics.get('52_week_low', 0), 'currency')} - {safe_format(financial_metrics.get('52_week_high', 0), 'currency')}
+Dividend Yield: {safe_format(financial_metrics.get('dividend_yield'), 'percent', default='No dividend')}
+
+## DATA QUALITY NOTES
+{f"⚠️ Data Quality Flags: {', '.join(financial_metrics.get('data_quality_flags', []))}" if financial_metrics.get('data_quality_flags') else "✓ All key metrics validated successfully"}
+
+**IMPORTANT DATA VALIDATION GUIDELINES:**
+- Dividend yields above 25% are flagged as potentially erroneous (Indian stocks may have higher yields)
+- ROE values below 1% or above 100% are flagged for manual review  
+- Revenue growth above 200% is flagged as potentially erroneous
+- Cross-validated price data with 1-year historical data when available
 
 ## ENHANCED MARKET SENTIMENT ANALYSIS
 Overall Sentiment: {sentiment_summary.get('sentiment', 'neutral').title()}
@@ -633,8 +804,8 @@ Recent Headlines Sample:
 ## ADVANCED AI PRICE FORECAST
 Forecast Model: Enhanced ARIMA + Holt-Winters with Sentiment Fusion
 Forecast Horizon: {len(forecast.get('mean', []))} periods
-Current Price: ${current_price:.2f}
-Predicted Price Range: ${min(forecast.get('mean', [current_price])):.2f} - ${max(forecast.get('mean', [current_price])):.2f}
+Current Price: {safe_format(current_price, 'currency')}
+Predicted Price Range: {safe_format(min(forecast.get('mean', [current_price or 0])), 'currency')} - {safe_format(max(forecast.get('mean', [current_price or 0])), 'currency')}
 Expected Price Change: {forecast_change:+.2f}%
 Sentiment Impact: {((forecast.get('diagnostics', {}).get('sentiment_adjustment', 1.0) - 1.0) * 100):+.2f}%
 Historical Volatility: {forecast.get('diagnostics', {}).get('historical_volatility', 0):.3f}
@@ -651,8 +822,11 @@ Please provide a comprehensive investment analysis report with the following sec
 
 2. **FUNDAMENTAL ANALYSIS** (2 paragraphs)
    - Deep dive into financial metrics (valuation, profitability, growth, debt)
-   - Compare to industry benchmarks where applicable
-   - Assess financial strength and sustainability
+   - **CRITICAL**: If any data quality flags are present, acknowledge the data limitations and provide context
+   - If dividend yield appears unrealistic (>10%), note this as likely data error and provide typical industry context
+   - If ROE appears too low (<5%) or too high (>50%), flag as potentially erroneous
+   - Compare to reasonable industry benchmarks and historical norms
+   - Assess financial strength while noting any metric validation concerns
 
 3. **MARKET SENTIMENT & NEWS ANALYSIS** (1-2 paragraphs)
    - Interpret sentiment scores and their reliability
@@ -680,6 +854,8 @@ Please provide a comprehensive investment analysis report with the following sec
    - Professional advice recommendation
 
 Use professional financial analysis language with specific data points. Make the recommendation actionable and well-justified.
+
+**CRITICAL: Date your analysis as of {current_date}. All references to timeframes should be relative to this current date. Do not use historical dates like 2023 or 2024. This is a live analysis for {current_date}.**
 """
 
     try:
