@@ -1,0 +1,47 @@
+[33mcommit 0e985c9ad5d6d7bce6f47eaad0a10bd95ca7c488[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sun Oct 12 15:50:23 2025 +0530
+
+    connected front and backend
+
+[33mcommit f76255a2e1f059049266f99a88af4cedc3d1dc9a[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sun Oct 12 15:47:54 2025 +0530
+
+    connected back and frontend
+
+[33mcommit 5856a06f1dd5e871c1afe3b7b1933dc538c2d860[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Amitesh Jammula <amiteshjammula@Amiteshs-MacBook-Pro.local>
+Date:   Sat Oct 11 17:58:56 2025 +0530
+
+    added v1 backend
+
+[33mcommit 6be6e3a04b96d028bdd7ffebe0f4fc2011838da4[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sat Oct 11 14:27:27 2025 +0530
+
+    base framework
+
+[33mcommit ec6a8d22aed5fb7af6b61607eff3ae2be87ef066[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sat Oct 11 13:53:19 2025 +0530
+
+    webapp made
+
+[33mcommit 79629ea5294899b6d78adddb0ea4c3d6b2e48e64[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sat Oct 11 13:25:14 2025 +0530
+
+    feat: Add initial project setup and team files
+
+[33mcommit d917ec8f3977479cd722e663f35fc0fe2a55c0d6[m
+Author: Vihas111 <vihasb23@gmail.com>
+Date:   Sat Oct 11 13:14:07 2025 +0530
+
+    feat: Add .gitignore file
+
+[33mcommit 02900918193ff0b733b9340f1fb75498b0638444[m
+Author: Amitesh-AJ10 <146316514+Amitesh-AJ10@users.noreply.github.com>
+Date:   Fri Oct 10 19:15:18 2025 +0530
+
+    Initial commit
