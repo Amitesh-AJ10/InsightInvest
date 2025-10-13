@@ -1,10 +1,8 @@
-Certainly! Here's your project README.md formatted properly with Markdown for clarity and readability:
-
 # InsightInvest
 
 **InsightInvest** is an AI-powered chatbot designed to democratize financial intelligence. It acts as a personal investment research analyst, performing deep, multi-faceted research on any publicly traded company to generate a comprehensive investment outlook report.
 
-✨ [View the Live Demo](#) ✨
+✨ [View the Live Demo](https://insight-invest.vercel.app/) ✨
 
 ---
 
@@ -83,14 +81,9 @@ cd InsightInvest
 
 ### 2. Set Up Environment Variables
 
-The project requires API keys for Google Gemini and Hugging Face.
+The project requires API keys for Alpha Vantage, Google Gemini, and Hugging Face.
 
-Create a file named `.env` in the backend by copying the example file:
-
-```bash
-cp .env.example .env
-```
-
+Create a file named `.env` in the backend folder.
 Open `.env` and add your API keys:
 
 ```env
@@ -130,9 +123,6 @@ cd investchat
 # Install Node.js dependencies
 npm install
 
-# Create a local environment file for the frontend
-cp ../.env.example .env.local
-
 # Edit .env.local and set the API URL for local development
 # NEXT_PUBLIC_API_URL="http://127.0.0.1:8000"
 
@@ -154,12 +144,6 @@ The frontend application will now be running at `http://localhost:3000`.
 
 * **URL Params:**
   `symbol=[string]` (e.g., AAPL, TSLA)
-
-* **Query Params:**
-
-  * `steps=[integer]` (optional, default: 10): Number of periods to forecast.
-  * `period=[string]` (optional, default: 6mo): Historical data period.
-  * `news_items=[integer]` (optional, default: 15): Number of news articles to analyze.
 
 * **Success Response:**
 
