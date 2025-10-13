@@ -85,7 +85,7 @@ cd InsightInvest
 
 The project requires API keys for Google Gemini and Hugging Face.
 
-Create a file named `.env` in the root directory by copying the example file:
+Create a file named `.env` in the backend by copying the example file:
 
 ```bash
 cp .env.example .env
