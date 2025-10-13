@@ -1,19 +1,27 @@
 // app/api/analyze/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 
-// The URL of your running Python FastAPI server
-const PYTHON_BACKEND_URL = 'http://127.0.0.1:8000/forecast';
+// The URL is now dynamically pulled from environment variables.
+// This is the ONLY line that needs to change.
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function POST(req: NextRequest) {
   try {
+    // --- No changes needed below this line ---
+
+    if (!PYTHON_BACKEND_URL) {
+      throw new Error("NEXT_PUBLIC_API_URL environment variable is not set.");
+    }
+
     const { company } = await req.json();
 
     if (!company || typeof company !== 'string' || !company.trim()) {
       return NextResponse.json({ error: 'Company symbol is required.' }, { status: 400 });
     }
 
-    // Make a GET request to the Python backend with the symbol in the URL
-    const requestUrl = `${PYTHON_BACKEND_URL}/${encodeURIComponent(company.trim())}`;
+    // The base URL is now dynamic, pointing to either localhost or your live Render API
+    const requestUrl = `${PYTHON_BACKEND_URL}/forecast/${encodeURIComponent(company.trim())}`;
     console.log(`Forwarding request to: ${requestUrl}`);
 
     const pythonResponse = await fetch(requestUrl);
@@ -44,7 +52,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: pythonResponse.status || 502 });
     }
 
-    // Forward the successful JSON response from Python back to the chat UI
     return NextResponse.json(data, { status: 200 });
 
   } catch (error: unknown) {
