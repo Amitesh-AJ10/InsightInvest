@@ -41,11 +41,6 @@ The project is a monorepo containing a separate frontend and backend, ensuring a
 ### System Architecture
 
 ```mermaid
----
-config:
-  theme: mc
-  look: neo
----
 graph TD
     subgraph "User's Browser"
         User>👨‍💻 User]
