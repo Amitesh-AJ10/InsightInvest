@@ -6,6 +6,9 @@
 .env*.local
 /backend/.env
 
+# Python virtual environment
+venv/
+
 # Build directory
 /.next/
 /out/

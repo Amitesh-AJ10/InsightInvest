@@ -28,6 +28,98 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.arima.model import ARIMA
 
 from news_scrapping import generate_google_news_rss_url, fetch_news_items
+from urllib.parse import quote_plus
+
+# reuse a browser-like user agent for external HTTP calls
+USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
+
+async def resolve_company_to_symbol(query: str) -> Dict[str, str]:
+    """Try to resolve a company name to a ticker symbol using Yahoo Finance search API.
+
+    Returns a dict with keys: 'symbol' and 'name' when found. Falls back to returning the original query as symbol.
+    """
+    # First try Yahoo Finance quick-search
+    # Quick local mapping fallback for common company names to reduce failure cases
+    common_map = {
+        'APPLE': 'AAPL',
+        'MICROSOFT': 'MSFT',
+        'GOOGLE': 'GOOGL',
+        'ALPHABET': 'GOOGL',
+        'AMAZON': 'AMZN',
+        'TESLA': 'TSLA',
+        'NVIDIA': 'NVDA',
+        'META': 'META',
+        'META PLATFORMS': 'META',
+        'META PLATFORMS, INC.': 'META',
+        'IBM': 'IBM',
+        'INTEL': 'INTC',
+        'ORACLE': 'ORCL',
+        'QUALCOMM': 'QCOM',
+        'TSM': 'TSM'
+    }
+    qnorm = query.strip().upper()
+    if qnorm in common_map:
+        logger.info(f"Resolved '{query}' -> {common_map[qnorm]} via local mapping")
+        return {"symbol": common_map[qnorm], "name": query}
+    try:
+        qs = quote_plus(query)
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={qs}&quotesCount=5&newsCount=0"
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers={"User-Agent": USER_AGENT})
+            resp.raise_for_status()
+            j = resp.json()
+            quotes = j.get("quotes") or []
+            if quotes:
+                top = quotes[0]
+                sym = top.get("symbol")
+                name = top.get("longname") or top.get("shortname") or top.get("quoteType") or query
+                if sym:
+                    # Preserve common exchange suffixes like .NS/.BO if provided in symbol
+                    logger.info(f"Resolved '{query}' -> {sym} ({name}) via Yahoo search")
+                    return {"symbol": sym, "name": name}
+    except Exception as e:
+        logger.debug(f"Company resolve failed for '{query}' via Yahoo: {e}")
+
+    # If Yahoo didn't help, try using Gemini to parse the user's input and suggest a canonical symbol
+    try:
+        prompt = (
+            f"User provided: '{query}'.\n" 
+            "Extract the most likely stock ticker symbol and the canonical company name. "
+            "If the input already contains an exchange suffix (like .NS, .BO, .L), preserve it. "
+            "Return plain JSON with keys: symbol and name. If you can't find a ticker, set symbol to an uppercased version of the input.\n\n"
+            "Respond only with JSON."
+        )
+        resp = await gemini_model.generate_content_async(prompt)
+        text = (getattr(resp, 'text', '') or '').strip()
+        # Try to parse JSON from the model output
+        import json as _json
+        try:
+            parsed = _json.loads(text)
+            sym = parsed.get('symbol')
+            name = parsed.get('name') or query
+            if sym:
+                logger.info(f"Resolved '{query}' -> {sym} ({name}) via Gemini fallback")
+                return {"symbol": sym, "name": name}
+        except Exception:
+            # not strict JSON: attempt to extract SYMBOL: ... lines
+            m = re.search(r'"?symbol"?\s*[:=]\s*"?([A-Za-z0-9\.\-_]+)"?', text)
+            n = re.search(r'"?name"?\s*[:=]\s*"?([^\n\"]+)"?', text)
+            if m:
+                sym = m.group(1)
+                name = n.group(1).strip() if n else query
+                logger.info(f"Parsed fallback from Gemini for '{query}' -> {sym} ({name})")
+                return {"symbol": sym, "name": name}
+    except Exception as e:
+        logger.debug(f"Gemini fallback failed for '{query}': {e}")
+
+    # fallback: if input already looks like symbol, return as-is, otherwise uppercase
+    if re.match(r'^[A-Za-z0-9\.\-]+$', query):
+        return {"symbol": query.upper(), "name": query}
+    return {"symbol": query.upper(), "name": query}
 
 # ------------- Setup & Config -------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -160,7 +252,22 @@ async def fetch_real_stock_data(symbol: str, period: str = "6mo", interval: str 
                                 break
                     except Exception:
                         continue
-            
+
+            # If still empty, try resolving company name -> symbol (e.g., 'Apple' -> 'AAPL')
+            if df.empty:
+                try:
+                    resolved = await resolve_company_to_symbol(symbol)
+                    resolved_sym = resolved.get("symbol")
+                    if resolved_sym and resolved_sym.upper() != normalized_symbol.upper():
+                        logger.info(f"Attempting data fetch with resolved symbol {resolved_sym}")
+                        alt_ticker = yf.Ticker(resolved_sym)
+                        df = alt_ticker.history(period=period, interval=interval)
+                        if not df.empty:
+                            normalized_symbol = resolved_sym
+                            logger.info(f"Found data using resolved symbol: {resolved_sym}")
+                except Exception as e:
+                    logger.debug(f"Resolve-and-retry failed: {e}")
+
             if df.empty:
                 raise ValueError(f"No data found for symbol {normalized_symbol}. For Indian stocks, try adding .NS (NSE) or .BO (BSE) suffix.")
         
@@ -541,6 +648,22 @@ def plot_advanced_forecast(
     ax1.set_ylabel("Price ($)", fontsize=12)
     ax1.legend(fontsize=10, loc='upper left')
     ax1.grid(True, alpha=0.3)
+
+    # Improve x-axis date formatting to avoid label clumping
+    try:
+        import matplotlib.dates as mdates
+        locator = mdates.AutoDateLocator(minticks=4, maxticks=10)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax1.xaxis.set_major_locator(locator)
+        ax1.xaxis.set_major_formatter(formatter)
+        for label in ax1.get_xticklabels():
+            label.set_rotation(25)
+            label.set_horizontalalignment('right')
+    except Exception:
+        # Fallback: rotate existing labels
+        for label in ax1.get_xticklabels():
+            label.set_rotation(25)
+            label.set_horizontalalignment('right')
     
     # Add forecast statistics text box
     current_price = history["Close"].iloc[-1]
@@ -906,9 +1029,15 @@ async def get_comprehensive_forecast(
     - Professional investment reports with actionable recommendations
     """
     
-    symbol = symbol.upper().strip()
-    if not re.match(r"^[A-Z0-9:.]+$", symbol):
-        raise HTTPException(status_code=400, detail="Invalid stock symbol format")
+    orig_symbol = symbol.strip()
+    # If user provided a company name (contains spaces or letters beyond ticker chars), try to resolve
+    if re.search(r"[^A-Z0-9:.]", orig_symbol, re.IGNORECASE):
+        resolved = await resolve_company_to_symbol(orig_symbol)
+        symbol = resolved.get("symbol", orig_symbol).upper()
+        company_name = resolved.get("name", orig_symbol)
+    else:
+        symbol = orig_symbol.upper()
+        company_name = orig_symbol
     
     client_ip = request.client.host if request and request.client else "unknown"
     if is_rate_limited(client_ip):
@@ -916,18 +1045,66 @@ async def get_comprehensive_forecast(
     
     try:
         logger.info(f"Starting enhanced comprehensive analysis for {symbol}")
-        
+
         # Fetch real stock data
         stock_data = await fetch_real_stock_data(symbol, period=period, interval="1d")
-        
+
         # Fetch comprehensive financial metrics
         financial_metrics = await fetch_financial_metrics(symbol)
+
+        # If metrics look empty or contain an error (common when user passed a company name
+        # that wasn't resolved earlier), try resolving the company name -> symbol and refetch.
+        need_resolve = False
+        if not financial_metrics:
+            need_resolve = True
+        elif isinstance(financial_metrics, dict) and financial_metrics.get("error"):
+            need_resolve = True
+        else:
+            sector = financial_metrics.get("sector")
+            # If sector/industry are missing or marked N/A, it's a hint the symbol wasn't found
+            if sector in (None, "N/A", ""):
+                need_resolve = True
+
+        if need_resolve and orig_symbol and orig_symbol.lower() != symbol.lower():
+            # If the original input differs from the current symbol, attempt resolution
+            try:
+                resolved = await resolve_company_to_symbol(orig_symbol)
+                resolved_sym = resolved.get("symbol")
+                resolved_name = resolved.get("name") or company_name
+                if resolved_sym and resolved_sym.upper() != symbol.upper():
+                    logger.info(f"Refetching data using resolved symbol {resolved_sym} for input '{orig_symbol}'")
+                    # Try fetching stock data and metrics with the resolved symbol
+                    try:
+                        stock_data = await fetch_real_stock_data(resolved_sym, period=period, interval="1d")
+                    except Exception:
+                        # keep previous stock_data if resolved fetch fails
+                        logger.debug(f"Resolved stock data fetch failed for {resolved_sym}")
+
+                    try:
+                        financial_metrics = await fetch_financial_metrics(resolved_sym)
+                    except Exception:
+                        logger.debug(f"Resolved financial metrics fetch failed for {resolved_sym}")
+
+                    # Update symbol and company_name for downstream use
+                    symbol = resolved_sym.upper()
+                    company_name = resolved_name
+            except Exception as e:
+                logger.debug(f"Secondary resolve attempt failed for '{orig_symbol}': {e}")
         
         # Fetch and analyze news sentiment with advanced metrics
-        rss_url = generate_google_news_rss_url(symbol, hl="en-IN", gl="IN", ceid="IN:en")
+        # Use both symbol and company name to fetch broader news coverage
+        query_for_news = f"{company_name} OR {symbol}"
+        rss_url = generate_google_news_rss_url(query_for_news, hl="en-IN", gl="IN", ceid="IN:en")
         raw_news_items = fetch_news_items(rss_url, max_results=news_items)
+        # Build two representations: plain titles for sentiment analysis and structured items for UI
         news_texts = [item["title"] for item in raw_news_items if item.get("title")]
-        
+        news_items_short = []
+        for item in raw_news_items[:5]:
+            title = item.get("title") or "(no title)"
+            # prefer resolved original_link when available, fall back to the RSS link
+            url = item.get("original_link") or item.get("link") or ""
+            news_items_short.append({"title": title, "url": url})
+
         sentiment = await analyze_sentiment_advanced(news_texts)
         
         # Generate enhanced forecast with stronger sentiment fusion
@@ -968,12 +1145,14 @@ async def get_comprehensive_forecast(
             "analysis_timestamp": datetime.now().isoformat(),
             "version": "2.0.0",
             "company_info": {
-                "name": financial_metrics.get("company_name", symbol),
+                "name": financial_metrics.get("company_name", company_name),
                 "sector": financial_metrics.get("sector", "N/A"),
                 "industry": financial_metrics.get("industry", "N/A"),
                 "current_price": financial_metrics.get("current_price", 0),
                 "market_cap": financial_metrics.get("market_cap", 0)
             },
+            # news_headlines now contains objects with title+url for clickable UI rendering
+            "news_headlines": news_items_short,
             "financial_metrics": financial_metrics,
             "market_sentiment": {
                 "source": f"Google News RSS + HuggingFace FinBERT - {len(raw_news_items)} articles fetched",

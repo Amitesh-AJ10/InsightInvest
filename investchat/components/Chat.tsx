@@ -23,6 +23,13 @@ interface AnalysisReport {
   visualization: {
     chart: string; // This is the base64 image string
   };
+  // Optional additional fields the backend may provide
+  news_headlines?: string[];
+  financial_metrics?: Record<string, string | number>;
+  suggestions?: {
+    tradingview?: string[];
+  };
+  symbol?: string;
 }
 
 // A custom message type that includes our optional 'ui' property
@@ -37,45 +44,46 @@ export function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
   // viewportRef reserved if we switch to a ref-based scroll approach later
+  // Reusable analyze function so it can be used by the form submit and featured-stock clicks
+  const analyzeRaw = async (rawInput: string) => {
+    const raw = rawInput.trim();
+    if (!raw) return;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const ticker = input.trim().toUpperCase();
-    // Enhanced validation: Support international markets with suffixes
-    // US: AAPL, MSFT (1-5 letters)
-    // Indian: RELIANCE.NS, TCS.BO (letters + .NS/.BO)
-    // UK: BP.L (letters + .L)
-    // Other: SYMBOL.XX (letters + .country code)
-    const isValidTicker = /^[A-Z]{1,12}(\.[A-Z]{1,3})?$/.test(ticker);
-    
-    if (!isValidTicker) {
-      setInputError('Please enter a valid ticker (e.g., AAPL, RELIANCE.NS, TCS.BO).');
+    // Allow either a ticker (AAPL, RELIANCE.NS) OR a company/name like "Nvidia", "Nvidia Corp", "Apple Inc"
+    const asUpper = raw.toUpperCase();
+    const isTickerPattern = /^[A-Z]{1,12}(\.[A-Z]{1,3})?$/.test(asUpper);
+    // Loose company/name pattern: letters, numbers, spaces, common punctuation, 2-80 chars
+    const isNamePattern = /^[A-Za-z0-9&\-\.,'()\s]{2,80}$/.test(raw) && /[A-Za-z]/.test(raw);
+
+    if (!isTickerPattern && !isNamePattern) {
+      setInputError('Please enter a valid ticker or company name (e.g., AAPL, RELIANCE.NS, Nvidia, Nvidia Corp).');
+      setIsLoading(false);
       return;
     }
     if (isLoading) return;
 
-  const userMessage: ExtendedMessage = { role: 'user', content: input, timestamp: new Date().toISOString() };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+      // append user message inside analyzeRaw to keep a single source of truth
+      const userMessage: ExtendedMessage = { role: 'user', content: raw, timestamp: new Date().toISOString() };
+      setMessages(prev => [...prev, userMessage]);
 
     try {
       setInputError(null);
+      // Send the raw user input to the backend. Backend can resolve tickers or company names via an API/Gemini call.
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: ticker }),
+        body: JSON.stringify({ company: raw }),
       });
 
-  const report: AnalysisReport | { error: string } = await response.json();
+      const report: AnalysisReport | { error: string } = await response.json();
 
       if ('error' in report || !response.ok) {
         const maybeErr = report && typeof report === 'object' && 'error' in report ? (report as { error?: unknown }).error : undefined;
         const errMsg = typeof maybeErr === 'string' ? maybeErr : 'Failed to get analysis.';
         throw new Error(errMsg);
       }
-      
-  const graphDataUrl = report.visualization?.chart ? `data:image/png;base64,${report.visualization.chart}` : null;
+
+      const graphDataUrl = report.visualization?.chart ? `data:image/png;base64,${report.visualization.chart}` : null;
 
       const aiMessage: ExtendedMessage = {
         role: 'assistant',
@@ -168,6 +176,109 @@ export function Chat() {
                 </div>
               )}
             </div>
+            {/* Top News Headlines (3-5) */}
+            {report.news_headlines && report.news_headlines.length > 0 && (
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-white border border-gray-200/50 p-4 shadow-sm">
+                <h4 className="text-lg font-bold text-gray-900 mb-3">Top News</h4>
+                <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
+                  {report.news_headlines.slice(0, 5).map((item: any, i: number) => (
+                    <li key={i} className="truncate">
+                      {item && item.url ? (
+                        <a href={item.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                          {item.title}
+                        </a>
+                      ) : (
+                        <span>{item.title || String(item)}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Key Financial Metrics (compact) */}
+            {report.financial_metrics && Object.keys(report.financial_metrics).length > 0 && (
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-white border border-gray-200/50 p-4 shadow-sm">
+                <h4 className="text-lg font-bold text-gray-900 mb-3">Key Metrics</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  {/* Preferred keys: company_name, sector, industry, market_cap, pe_ratio, forward_pe, eps, debt_to_equity, revenue_trend, profit_margin_trend */}
+                  {(() => {
+                    const fm = report.financial_metrics || {};
+                    const rows: Array<[string, string]> = [];
+                    if (fm['company_name']) rows.push(['Company', String(fm['company_name'])]);
+                    if (fm['sector']) rows.push(['Sector', String(fm['sector'])]);
+                    if (fm['industry']) rows.push(['Industry', String(fm['industry'])]);
+                    if (fm['market_cap']) {
+                      // human friendly fmt
+                      const n = Number(fm['market_cap']) || 0;
+                      const fmt = n >= 1e12 ? (n/1e12).toFixed(2)+'T' : n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : String(n);
+                      rows.push(['Market Cap', fmt]);
+                    }
+                    if (fm['pe_ratio'] || fm['pe']) rows.push(['P/E Ratio', String(fm['pe_ratio'] || fm['pe'])]);
+                    if (fm['forward_pe']) rows.push(['Forward P/E', String(fm['forward_pe'])]);
+                    if (fm['eps']) rows.push(['EPS', String(fm['eps'])]);
+                    if (fm['debt_to_equity'] || fm['debt_equity']) rows.push(['D/E Ratio', String(fm['debt_to_equity'] || fm['debt_equity'])]);
+                    if (fm['revenue_trend']) rows.push(['Revenue Trend', String(fm['revenue_trend'])]);
+                    if (fm['profit_margin_trend']) rows.push(['Profit Margin', String(fm['profit_margin_trend'])]);
+                    // fallback: show first 6 entries if nothing matched
+                    if (rows.length === 0) {
+                      return Object.entries(fm).slice(0,6).map(([k,v]) => (
+                        <div key={k} className="bg-white/70 rounded-lg p-3 border border-gray-100">
+                          <div className="text-gray-600 mb-1 truncate">{k.replace(/_/g,' ')}</div>
+                          <div className="font-semibold text-gray-900">{String(v)}</div>
+                        </div>
+                      ));
+                    }
+                    return rows.slice(0,6).map(([label, val]) => (
+                      <div key={label} className="bg-white/70 rounded-lg p-3 border border-gray-100">
+                        <div className="text-gray-600 mb-1 truncate">{label}</div>
+                        <div className="font-semibold text-gray-900">{val}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* TradingView suggestions (static fallback) */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-white border border-gray-200/50 p-4 shadow-sm">
+              <h4 className="text-lg font-bold text-gray-900 mb-2">TradingView Suggestions</h4>
+              <div className="text-sm text-gray-700 mb-3">Indicators & timeframes you can try on TradingView</div>
+              <div className="flex flex-wrap gap-2">
+                {(report.suggestions?.tradingview || [
+                  'EMA(20), EMA(50)',
+                  'RSI(14) - look for divergence/overbought',
+                  'MACD(12,26,9) - crossovers',
+                  'Ichimoku Cloud - trend confirmation',
+                  'Timeframes: 1D, 4H, 1W'
+                ]).map((s, idx) => (
+                  <div key={idx} className="px-3 py-1 bg-white/80 border border-gray-100 rounded-full text-xs font-medium text-gray-800">{s}</div>
+                ))}
+              </div>
+              {/* Quick TradingView link */}
+              <div className="mt-4 flex items-center gap-3">
+                <a
+                  target="_blank"
+                  rel="noreferrer"
+                  href={report.symbol ? `https://www.tradingview.com/symbols/${encodeURIComponent(report.symbol)}/` : 'https://www.tradingview.com/' }
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:opacity-95"
+                >
+                  Open interactive chart
+                </a>
+                <div className="text-xs text-gray-500">(opens TradingView search for the symbol)</div>
+              </div>
+            </div>
+
+            {/* Metric definitions */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-white to-white/80 border border-gray-100 p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-gray-900 mb-2">Metric definitions</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-700">
+                <div><strong>P/E Ratio</strong>: Price per share ÷ Earnings per share (higher = more expensive).</div>
+                <div><strong>EPS</strong>: Earnings per share — company's profit allocated per share.</div>
+                <div><strong>D/E Ratio</strong>: Debt-to-Equity — company's leverage level.</div>
+                <div><strong>Revenue / Profit Margin</strong>: Trends show recent quarterly revenue and margin performance.</div>
+              </div>
+            </div>
           </div>
         )
       };
@@ -183,6 +294,16 @@ export function Chat() {
     }
   };
 
+  // Form submit wrapper that uses analyzeRaw
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const raw = input.trim();
+    if (!raw) return;
+    setIsLoading(true);
+    await analyzeRaw(raw);
+    setInput('');
+  };
+
   // Auto-scroll effect: scroll to bottom whenever messages change
   useEffect(() => {
     // best-effort: find the chat scroll container inside this component
@@ -194,6 +315,40 @@ export function Chat() {
       }, 50);
     }
   }, [messages, isLoading]);
+
+  // Click listener: detect clicks on featured-stock tiles and trigger analysis
+    useEffect(() => {
+    const handler = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      // Find the closest ancestor whose class contains 'group/item' or 'group-item'
+      const el = target.closest('[class*="group/item"], [class*="group-item"], .group-item') as HTMLElement | null;
+      if (!el) return;
+
+      // Prefer the .font-semibold element (ticker text), else first div
+      const symbolNode = el.querySelector('.font-semibold') || el.querySelector('div');
+      if (!symbolNode) return;
+      const rawText = (symbolNode.textContent || '').trim();
+      // Extract first token that looks like a ticker (letters, numbers, dot, dash)
+      const m = rawText.match(/[A-Z0-9\.\-]{1,20}/i);
+      if (!m) return;
+      const ticker = m[0].toUpperCase();
+
+      // If already loading or input matches current ticker, do nothing
+      if (isLoading) return;
+      if (input.trim().toUpperCase() === ticker) return;
+
+      // Populate input then call analyzeRaw once (analyzeRaw appends the user message)
+      setInput(ticker);
+      setIsLoading(true);
+      setTimeout(async () => {
+        await analyzeRaw(ticker);
+      }, 50);
+    };
+
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [input, isLoading]);
 
   return (
     <div className="relative">
