@@ -1,6 +1,5 @@
 Certainly! Here's your project README.md formatted properly with Markdown for clarity and readability:
 
-````markdown
 # InsightInvest
 
 **InsightInvest** is an AI-powered chatbot designed to democratize financial intelligence. It acts as a personal investment research analyst, performing deep, multi-faceted research on any publicly traded company to generate a comprehensive investment outlook report.
@@ -61,7 +60,7 @@ graph TD
     H --> C
     C --> B
     B --> A
-````
+```
 
 ---
 
