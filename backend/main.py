@@ -379,6 +379,8 @@ async def fetch_financial_metrics(symbol: str) -> Dict[str, Any]:
             "volume": info.get("volume", 0),
             "avg_volume": info.get("averageVolume", 0)
         }
+        # include reported currency from yfinance if available
+        metrics["currency"] = info.get("currency", None)
         
         # Cross-validate and fix obvious errors using historical data
         try:
@@ -851,11 +853,16 @@ async def generate_comprehensive_report(
     financial_metrics: Dict[str, Any],
     forecast: Dict[str, Any],
     sentiment_summary: Dict[str, Any],
-    news_headlines: List[str]
+    news_headlines: List[str],
+    currency: str = "USD"
 ) -> str:
     """Generate comprehensive investment analysis report"""
     
     # Helper function to safely format metrics
+    # currency_symbol mapping
+    currency_symbols = {"USD": "$", "INR": "₹"}
+    cur_sym = currency_symbols.get(currency.upper(), "")
+
     def safe_format(value, format_type="float", suffix="", default="N/A"):
         """Safely format financial metrics, handling None values"""
         if value is None:
@@ -866,7 +873,11 @@ async def generate_comprehensive_report(
             elif format_type == "percent":
                 return f"{float(value):.2f}%"
             elif format_type == "currency":
-                return f"${float(value):.2f}"
+                # use detected currency symbol if available
+                try:
+                    return f"{cur_sym}{float(value):.2f}"
+                except Exception:
+                    return default
             else:
                 return str(value) + suffix
         except (ValueError, TypeError):
@@ -879,20 +890,22 @@ async def generate_comprehensive_report(
     
     # Get current date for accurate context
     current_date = datetime.now().strftime("%B %d, %Y")
-    
+
     prompt = f"""
 You are a Senior AI Financial Analyst at InsightInvest generating a comprehensive investment research report for {symbol.upper()}.
 
-**IMPORTANT: Today's date is {current_date}. Please ensure all analysis reflects the current market context for {current_date}.**
+IMPORTANT: Today's date is {current_date}. Please ensure all analysis reflects the current market context for {current_date}.
 
-## COMPANY OVERVIEW
+IMPORTANT: Report all monetary values in {currency} using the currency symbol {cur_sym} where appropriate. If the company trades on NSE/BSE, use INR; for major US listings use USD.
+
+COMPANY OVERVIEW
 Company: {financial_metrics.get('company_name', symbol)}
 Sector: {financial_metrics.get('sector', 'N/A')}
 Industry: {financial_metrics.get('industry', 'N/A')}
-Current Price: ${current_price:.2f}
+Current Price: {safe_format(current_price, 'currency')}
 
-## KEY FINANCIAL METRICS
-Market Cap: ${financial_metrics.get('market_cap', 0):,} (if > 0)
+KEY FINANCIAL METRICS
+Market Cap: {safe_format(financial_metrics.get('market_cap', 0), 'currency')}
 P/E Ratio: {safe_format(financial_metrics.get('pe_ratio'))}
 Forward P/E: {safe_format(financial_metrics.get('forward_pe'))}
 EPS: {safe_format(financial_metrics.get('eps'), 'currency')}
@@ -904,16 +917,16 @@ Beta: {safe_format(financial_metrics.get('beta'))}
 52-Week Range: {safe_format(financial_metrics.get('52_week_low', 0), 'currency')} - {safe_format(financial_metrics.get('52_week_high', 0), 'currency')}
 Dividend Yield: {safe_format(financial_metrics.get('dividend_yield'), 'percent', default='No dividend')}
 
-## DATA QUALITY NOTES
+DATA QUALITY NOTES
 {f"⚠️ Data Quality Flags: {', '.join(financial_metrics.get('data_quality_flags', []))}" if financial_metrics.get('data_quality_flags') else "✓ All key metrics validated successfully"}
 
-**IMPORTANT DATA VALIDATION GUIDELINES:**
+IMPORTANT DATA VALIDATION GUIDELINES:
 - Dividend yields above 25% are flagged as potentially erroneous (Indian stocks may have higher yields)
-- ROE values below 1% or above 100% are flagged for manual review  
+- ROE values below 1% or above 100% are flagged for manual review
 - Revenue growth above 200% is flagged as potentially erroneous
 - Cross-validated price data with 1-year historical data when available
 
-## ENHANCED MARKET SENTIMENT ANALYSIS
+ENHANCED MARKET SENTIMENT ANALYSIS
 Overall Sentiment: {sentiment_summary.get('sentiment', 'neutral').title()}
 Sentiment Score: {sentiment_summary.get('sentiment_score', 0.5):.3f} (0=Very Negative, 1=Very Positive)
 Confidence Level: {sentiment_summary.get('confidence', 0)*100:.1f}%
@@ -924,7 +937,7 @@ Sentiment Volatility: {sentiment_summary.get('volatility', 0):.3f} (Higher = Mor
 Recent Headlines Sample:
 {chr(10).join(['• ' + headline for headline in news_headlines[:5]])}
 
-## ADVANCED AI PRICE FORECAST
+ADVANCED AI PRICE FORECAST
 Forecast Model: Enhanced ARIMA + Holt-Winters with Sentiment Fusion
 Forecast Horizon: {len(forecast.get('mean', []))} periods
 Current Price: {safe_format(current_price, 'currency')}
@@ -934,51 +947,51 @@ Sentiment Impact: {((forecast.get('diagnostics', {}).get('sentiment_adjustment',
 Historical Volatility: {forecast.get('diagnostics', {}).get('historical_volatility', 0):.3f}
 Model Quality (AIC): {forecast.get('diagnostics', {}).get('arima_aic', 'N/A')}
 
-## GENERATE PROFESSIONAL INVESTMENT ANALYSIS
+GENERATE PROFESSIONAL INVESTMENT ANALYSIS
 
 Please provide a comprehensive investment analysis report with the following sections:
 
-1. **EXECUTIVE SUMMARY** (3-4 sentences)
-   - Overall investment thesis with specific recommendation
-   - Key drivers and major risks
-   - Price target based on forecast
+1. EXECUTIVE SUMMARY (3-4 sentences)
+    - Overall investment thesis with specific recommendation
+    - Key drivers and major risks
+    - Price target based on forecast (provide conservative/base/optimistic targets in {currency})
 
-2. **FUNDAMENTAL ANALYSIS** (2 paragraphs)
-   - Deep dive into financial metrics (valuation, profitability, growth, debt)
-   - **CRITICAL**: If any data quality flags are present, acknowledge the data limitations and provide context
-   - If dividend yield appears unrealistic (>10%), note this as likely data error and provide typical industry context
-   - If ROE appears too low (<5%) or too high (>50%), flag as potentially erroneous
-   - Compare to reasonable industry benchmarks and historical norms
-   - Assess financial strength while noting any metric validation concerns
+2. FUNDAMENTAL ANALYSIS (2 paragraphs)
+    - Deep dive into financial metrics (valuation, profitability, growth, debt)
+    - CRITICAL: If any data quality flags are present, acknowledge the data limitations and provide context
+    - If dividend yield appears unrealistic (>10%), note this as likely data error and provide typical industry context
+    - If ROE appears too low (<5%) or too high (>50%), flag as potentially erroneous
+    - Compare to reasonable industry benchmarks and historical norms
+    - Assess financial strength while noting any metric validation concerns
 
-3. **MARKET SENTIMENT & NEWS ANALYSIS** (1-2 paragraphs)
-   - Interpret sentiment scores and their reliability
-   - Analyze news themes and market perception
-   - Discuss sentiment volatility and consensus
+3. MARKET SENTIMENT & NEWS ANALYSIS (1-2 paragraphs)
+    - Interpret sentiment scores and their reliability
+    - Analyze news themes and market perception
+    - Discuss sentiment volatility and consensus
 
-4. **AI-ENHANCED PRICE FORECAST** (1-2 paragraphs)
-   - Explain the forecasting methodology and confidence
-   - Discuss how sentiment influenced the prediction
-   - Address forecast uncertainty and key assumptions
+4. AI-ENHANCED PRICE FORECAST (1-2 paragraphs)
+    - Explain the forecasting methodology and confidence
+    - Discuss how sentiment influenced the prediction
+    - Address forecast uncertainty and key assumptions
 
-5. **RISK ASSESSMENT** (1-2 paragraphs)
-   - Company-specific operational and financial risks
-   - Market and sector risks
-   - Technical and sentiment-based risks
+5. RISK ASSESSMENT (1-2 paragraphs)
+    - Company-specific operational and financial risks
+    - Market and sector risks
+    - Technical and sentiment-based risks
 
-6. **INVESTMENT RECOMMENDATION** (1-2 paragraphs)
-   - Clear recommendation: Strong Buy/Buy/Hold/Sell/Strong Sell
-   - Price targets (conservative, base case, optimistic)
-   - Investment timeline and key catalysts to watch
+6. INVESTMENT RECOMMENDATION (1-2 paragraphs)
+    - Clear recommendation: Strong Buy/Buy/Hold/Sell/Strong Sell
+    - Price targets (conservative, base case, optimistic) in {currency}
+    - Investment timeline and key catalysts to watch
 
-7. **DISCLAIMERS** (Brief)
-   - Standard investment disclaimers
-   - AI model limitations
-   - Professional advice recommendation
+7. DISCLAIMERS (Brief)
+    - Standard investment disclaimers
+    - AI model limitations
+    - Professional advice recommendation
 
 Use professional financial analysis language with specific data points. Make the recommendation actionable and well-justified.
 
-**CRITICAL: Date your analysis as of {current_date}. All references to timeframes should be relative to this current date. Do not use historical dates like 2023 or 2024. This is a live analysis for {current_date}.**
+CRITICAL: Date your analysis as of {current_date}. All references to timeframes should be relative to this current date. Do not use historical dates like 2023 or 2024. This is a live analysis for {current_date}.
 """
 
     try:
@@ -1129,13 +1142,22 @@ async def get_comprehensive_forecast(
             "light"
         )
         
-        # Generate comprehensive investment report
+        # Determine currency for reporting: prefer ticker/info currency, else infer from symbol
+        detected_currency = financial_metrics.get("currency") or None
+        if not detected_currency:
+            if symbol.endswith('.NS') or symbol.endswith('.BO'):
+                detected_currency = 'INR'
+            else:
+                detected_currency = 'USD'
+
+        # Generate comprehensive investment report (pass desired currency)
         comprehensive_report = await generate_comprehensive_report(
             symbol,
             financial_metrics,
             forecast_result,
             sentiment,
-            news_texts
+            news_texts,
+            currency=detected_currency
         )
         
         logger.info(f"Enhanced comprehensive analysis completed successfully for {symbol}")
