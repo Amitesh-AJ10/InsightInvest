@@ -134,24 +134,6 @@ The frontend application will now be running at `http://localhost:3000`.
 
 ---
 
-## 🌐 API Endpoint
-
-### Get Comprehensive Analysis
-
-* **URL:** `/forecast/{symbol}`
-
-* **Method:** GET
-
-* **URL Params:**
-  `symbol=[string]` (e.g., AAPL, TSLA)
-
-* **Success Response:**
-
-  * **Code:** 200
-  * **Content:** A JSON object containing the company info, financial metrics, sentiment analysis, price forecast, a base64-encoded chart image, and the full AI-generated report.
-
----
-
 ## 🚀 Deployment
 
 This application is designed for easy deployment on modern cloud platforms.
