@@ -422,10 +422,38 @@ async def fetch_financial_metrics(symbol: str) -> Dict[str, Any]:
                     revenue_data = quarterly_financials.loc["Total Revenue"].dropna()
                     revenue_trend = revenue_data.tolist()[:4]  # Last 4 quarters
                 metrics["quarterly_revenue_trend"] = revenue_trend
+
+                # Attempt to compute quarterly profit margin trend if Net Income (or 'Net Income') exists
+                profit_margin_trend = []
+                # Possible index keys that may represent net income
+                net_income_keys = [k for k in quarterly_financials.index if 'net' in k.lower() and 'income' in k.lower()]
+                if net_income_keys and "Total Revenue" in quarterly_financials.index:
+                    net_key = net_income_keys[0]
+                    try:
+                        net_vals = quarterly_financials.loc[net_key].dropna()
+                        rev_vals = quarterly_financials.loc["Total Revenue"].dropna()
+                        # align lengths and compute margin = net / revenue * 100
+                        n = min(len(net_vals), len(rev_vals))
+                        for i in range(n):
+                            ni = net_vals.iloc[i]
+                            rv = rev_vals.iloc[i]
+                            try:
+                                pm = (float(ni) / float(rv)) * 100 if rv and rv != 0 else None
+                            except Exception:
+                                pm = None
+                            profit_margin_trend.append(round(pm, 2) if pm is not None else None)
+                    except Exception:
+                        profit_margin_trend = []
+                # Fallback: if profit margin available as a single metric, repeat it
+                if not profit_margin_trend and metrics.get('profit_margin') is not None:
+                    profit_margin_trend = [metrics.get('profit_margin')] * min(4, len(revenue_trend) or 4)
+
+                metrics["quarterly_profit_margin_trend"] = profit_margin_trend
             else:
                 metrics["quarterly_revenue_trend"] = []
         except Exception:
             metrics["quarterly_revenue_trend"] = []
+            metrics["quarterly_profit_margin_trend"] = []
         
         financial_metrics_cache[cache_key] = metrics
         logger.info(f"Successfully fetched financial metrics for {normalized_symbol}")
@@ -617,7 +645,8 @@ def plot_advanced_forecast(
     forecast: Dict[str, Any], 
     symbol: str,
     sentiment_info: Dict[str, Any],
-    theme: str = "light"
+    theme: str = "light",
+    currency: str = "USD"
 ) -> str:
     """Create advanced forecast plot with enhanced styling and sentiment indicators"""
     try:
@@ -635,8 +664,8 @@ def plot_advanced_forecast(
     lower = np.array(forecast["lower"], dtype=float)
     upper = np.array(forecast["upper"], dtype=float)
     
-    # Enhanced forecast line
-    ax1.plot(future_index, mean, label="AI Forecast (Sentiment-Enhanced)", color="#F24236", linewidth=3, alpha=0.9)
+    # Forecast line
+    ax1.plot(future_index, mean, label="Forecast", color="#F24236", linewidth=3, alpha=0.9)
     ax1.fill_between(future_index, lower, upper, alpha=0.25, label="95% Confidence Interval", color="#F24236")
     
     # Add vertical line at forecast start
@@ -667,12 +696,16 @@ def plot_advanced_forecast(
             label.set_rotation(25)
             label.set_horizontalalignment('right')
     
+    # currency symbol for textbox and tick formatting
+    currency_symbols = {"USD": "$", "INR": "₹"}
+    cur_sym = currency_symbols.get(currency.upper(), "")
+
     # Add forecast statistics text box
     current_price = history["Close"].iloc[-1]
     forecast_end_price = mean[-1]
     price_change = ((forecast_end_price - current_price) / current_price) * 100
     
-    textstr = f'Current: ${current_price:.2f}\nForecast: ${forecast_end_price:.2f}\nChange: {price_change:+.1f}%'
+    textstr = f'Current: {cur_sym}{current_price:.2f}\nForecast: {cur_sym}{forecast_end_price:.2f}\nChange: {price_change:+.1f}%'
     props = dict(boxstyle='round', facecolor='lightblue', alpha=0.7)
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=props)
@@ -690,8 +723,8 @@ def plot_advanced_forecast(
     ax2.set_xlim(0, 1)
     ax2.set_ylim(-0.5, 0.5)
     ax2.set_xlabel("Sentiment Score", fontsize=12)
-    ax2.set_title(f"News Sentiment: {sentiment_label.title()} ({sentiment_score:.3f}) | Confidence: {confidence:.1%}", 
-                  fontsize=12, fontweight='bold')
+    # Display only numeric sentiment score in title to keep plot clean
+    ax2.set_title(f"Score: {sentiment_score:.3f} | Confidence: {confidence:.1%}", fontsize=12, fontweight='bold')
     ax2.set_yticks([])
     
     # Add sentiment threshold lines
@@ -704,6 +737,12 @@ def plot_advanced_forecast(
     ax2.text(0.85, 0, 'Positive', ha='center', va='center', fontweight='bold', fontsize=10)
     
     plt.tight_layout()
+    # Format y-axis ticks with currency symbol
+    try:
+        import matplotlib.ticker as mticker
+        ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{cur_sym}{x:,.2f}"))
+    except Exception:
+        pass
     
     try:
         buf = io.BytesIO()
@@ -1131,6 +1170,14 @@ async def get_comprehensive_forecast(
         )
         
         # Generate enhanced plot with better styling
+        # Determine currency for reporting: prefer ticker/info currency, else infer from symbol
+        detected_currency = financial_metrics.get("currency") or None
+        if not detected_currency:
+            if symbol.endswith('.NS') or symbol.endswith('.BO'):
+                detected_currency = 'INR'
+            else:
+                detected_currency = 'USD'
+
         sentiment_with_company = {**sentiment, "company_name": financial_metrics.get("company_name", symbol)}
         plot_b64 = await loop.run_in_executor(
             None,
@@ -1139,16 +1186,9 @@ async def get_comprehensive_forecast(
             forecast_result,
             symbol,
             sentiment_with_company,
-            "light"
+            "light",
+            detected_currency
         )
-        
-        # Determine currency for reporting: prefer ticker/info currency, else infer from symbol
-        detected_currency = financial_metrics.get("currency") or None
-        if not detected_currency:
-            if symbol.endswith('.NS') or symbol.endswith('.BO'):
-                detected_currency = 'INR'
-            else:
-                detected_currency = 'USD'
 
         # Generate comprehensive investment report (pass desired currency)
         comprehensive_report = await generate_comprehensive_report(

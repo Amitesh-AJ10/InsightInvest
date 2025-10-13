@@ -32,11 +32,11 @@ export default function Message({ role, content, ui, timestamp }: Props) {
             </svg>
           </div>
         )}
-        <div className={`relative rounded-2xl p-5 shadow-lg backdrop-blur-sm border transition-all duration-200 group-hover:shadow-xl max-w-[70%] break-words ${
-          isUser 
-            ? 'bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 text-white border-blue-500/20 shadow-blue-500/20 ml-4' 
-            : 'bg-white/90 dark:bg-gray-800 dark:text-gray-100 text-gray-800 border-gray-200/50 dark:border-gray-700/50 shadow-black/5 mr-4'
-        }`}>
+            <div className={`relative rounded-2xl p-5 shadow-lg backdrop-blur-sm border transition-all duration-200 group-hover:shadow-xl max-w-[70%] break-words ${
+              isUser 
+                ? 'bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 text-white border-blue-500/20 shadow-blue-500/20 ml-4' 
+                : 'bg-white/90 dark:bg-gray-800 dark:text-gray-100 text-gray-800 border-gray-200/50 dark:border-gray-700/50 shadow-black/5 mr-4'
+            }`}>
           <div className="flex items-start gap-3">
             <div className="flex-1 prose prose-sm max-w-full break-words">
               <ReactMarkdown 
