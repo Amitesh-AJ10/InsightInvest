@@ -205,19 +205,65 @@ export function Chat() {
                   {(() => {
                     const fm = report.financial_metrics || {};
                     const rows: Array<[string, string]> = [];
+
+                    // helper: compact number formatting (e.g., 94.04B)
+                    const compactNumber = (v: any) => {
+                      const n = Number(v);
+                      if (!isFinite(n)) return String(v);
+                      const abs = Math.abs(n);
+                      if (abs >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+                      if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+                      if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+                      return n.toLocaleString();
+                    };
+
+                    // helper: format array of numbers to human-friendly string
+                    const formatNumberArray = (arr: any[]) => {
+                      try {
+                        return arr.map(x => compactNumber(x)).join(', ');
+                      } catch {
+                        return String(arr);
+                      }
+                    };
+
+                    // helper: format percent array
+                    const formatPercentArray = (arr: any[]) => {
+                      try {
+                        return arr.map(x => {
+                          const n = Number(x);
+                          if (!isFinite(n)) return String(x);
+                          return `${n.toFixed(2)}%`;
+                        }).join(', ');
+                      } catch {
+                        return String(arr);
+                      }
+                    };
+
+                    // Prioritize the requested metrics: EPS, D/E, quarterly revenue and profit margin trends
+                    const fmtFloat = (v: any, d = 2) => {
+                      const n = Number(v);
+                      if (!isFinite(n)) return 'N/A';
+                      return n.toFixed(d);
+                    };
+
+                    if (fm['eps']) rows.push(['EPS', fmtFloat(fm['eps'])]);
+                    if (fm['debt_to_equity'] || fm['debt_equity']) rows.push(['D/E Ratio', fmtFloat(fm['debt_to_equity'] || fm['debt_equity'])]);
+                    // Prioritize P/E so it appears near top
+                    if (fm['pe_ratio'] || fm['pe']) rows.push(['P/E Ratio', fmtFloat(fm['pe_ratio'] || fm['pe'])]);
+                    if (fm['quarterly_revenue_trend'] && Array.isArray(fm['quarterly_revenue_trend']) && fm['quarterly_revenue_trend'].length) rows.push(['Quarterly Revenue', formatNumberArray(fm['quarterly_revenue_trend'])]);
+                    if (fm['quarterly_profit_margin_trend'] && Array.isArray(fm['quarterly_profit_margin_trend']) && fm['quarterly_profit_margin_trend'].length) rows.push(['Quarterly Profit Margin', formatPercentArray(fm['quarterly_profit_margin_trend'])]);
+
                     if (fm['company_name']) rows.push(['Company', String(fm['company_name'])]);
                     if (fm['sector']) rows.push(['Sector', String(fm['sector'])]);
                     if (fm['industry']) rows.push(['Industry', String(fm['industry'])]);
                     if (fm['market_cap']) {
                       // human friendly fmt
                       const n = Number(fm['market_cap']) || 0;
-                      const fmt = n >= 1e12 ? (n/1e12).toFixed(2)+'T' : n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : String(n);
+                      const fmt = n >= 1e12 ? (n/1e12).toFixed(2)+'T' : n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n.toLocaleString();
                       rows.push(['Market Cap', fmt]);
                     }
-                    if (fm['pe_ratio'] || fm['pe']) rows.push(['P/E Ratio', String(fm['pe_ratio'] || fm['pe'])]);
                     if (fm['forward_pe']) rows.push(['Forward P/E', String(fm['forward_pe'])]);
-                    if (fm['eps']) rows.push(['EPS', String(fm['eps'])]);
-                    if (fm['debt_to_equity'] || fm['debt_equity']) rows.push(['D/E Ratio', String(fm['debt_to_equity'] || fm['debt_equity'])]);
+                    // keep EPS/D/E already added above; avoid duplicates
                     if (fm['revenue_trend']) rows.push(['Revenue Trend', String(fm['revenue_trend'])]);
                     if (fm['profit_margin_trend']) rows.push(['Profit Margin', String(fm['profit_margin_trend'])]);
                     // fallback: show first 6 entries if nothing matched
