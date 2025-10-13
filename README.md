@@ -41,6 +41,11 @@ The project is a monorepo containing a separate frontend and backend, ensuring a
 ### System Architecture
 
 ```mermaid
+---
+config:
+  theme: dark
+  look: neo
+---
 graph TD
     subgraph "User's Browser"
         User>👨‍💻 User]
@@ -68,30 +73,27 @@ graph TD
     User -- "1.Enters Ticker" --> Frontend
     Frontend -- "2.API Request" --> API
     API -- "3.Triggers Core Logic" --> Engine
-
     Engine -- "4.Gathers &amp; Processes Data" --> Aggregation
     Aggregation --> Feature1
     Aggregation --> Feature2
     Aggregation --> Feature3
-
     Engine -- "5.Runs Internal Models" --> Feature4
     Engine -- "6.Synthesizes All Data" --> Feature5
-
     Engine -- "7.Returns Final Report" --> API
     API -- "8.Sends Response to Frontend" --> Frontend
     Frontend -- "9.Displays Report &amp; Chart" --> User
 
-    %% --- Styling ---
-    style User fill:#cde4ff,stroke:#333
-    style Frontend fill:#d3e3fd,stroke:#333,stroke-width:2px
-    style API fill:#d5fdd3,stroke:#333,stroke-width:2px
-    style Engine fill:#a2f59d,stroke:#333,stroke-width:2px
-    style Aggregation fill:#fdf7d3,stroke:#333,stroke-width:1.5px
-    style Feature1 fill:#ffe8d6,stroke:#333
-    style Feature2 fill:#ffe8d6,stroke:#333
-    style Feature3 fill:#ffe8d6,stroke:#333
-    style Feature4 fill:#fff2d6,stroke:#333
-    style Feature5 fill:#ffe8d6,stroke:#333
+    %% --- Styling (Dark Mode Friendly) ---
+    style User fill:#2d6cdf,stroke:#ffffff,stroke-width:1.5px,color:#ffffff
+    style Frontend fill:#3a8ef6,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    style API fill:#1ecf77,stroke:#ffffff,stroke-width:2px,color:#000000
+    style Engine fill:#28b463,stroke:#ffffff,stroke-width:2px,color:#000000
+    style Aggregation fill:#f4d03f,stroke:#ffffff,stroke-width:1.5px,color:#000000
+    style Feature1 fill:#f5b041,stroke:#ffffff,color:#000000
+    style Feature2 fill:#f5b041,stroke:#ffffff,color:#000000
+    style Feature3 fill:#f5b041,stroke:#ffffff,color:#000000
+    style Feature4 fill:#f8c471,stroke:#ffffff,color:#000000
+    style Feature5 fill:#f5b041,stroke:#ffffff,color:#000000
 
 ```
 
