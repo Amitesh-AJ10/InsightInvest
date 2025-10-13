@@ -41,23 +41,63 @@ The project is a monorepo containing a separate frontend and backend, ensuring a
 ### System Architecture
 
 ```mermaid
+---
+config:
+  theme: mc
+  look: neo
+---
 graph TD
-    A[User] --> B{Next.js Frontend on Vercel}
-    B --> C{FastAPI Backend on Render}
-    C --> D[Yahoo Finance API]
-    C --> E[Google News RSS]
-    E --> F[Hugging Face API - FinBERT]
-    subgraph "Data Synthesis & Analysis"
-        direction LR
-        D[Stock Data & Metrics] --> G{Forecasting Model}
-        F[Sentiment Score] --> G
-        G[Forecast Output] --> H{Gemini LLM}
-        D --> H
-        F --> H
+    subgraph "User's Browser"
+        User>👨‍💻 User]
     end
-    H --> C
-    C --> B
-    B --> A
+
+    subgraph "Frontend (Hosted on Vercel)"
+        Frontend[Next.js UI]
+    end
+
+    subgraph "Backend (Hosted on Render)"
+        API[⚡ FastAPI Endpoint]
+        Engine[🤖 AI Core Logic]
+    end
+
+    subgraph "External AI & Data Services"
+        Aggregation[<b>Step 3:</b><br>Gathers &amp; Processes External Data]
+        Feature1[<b>Quantitative Analysis</b><br>Yahoo Finance API]
+        Feature2[<b>Dynamic Web Research</b><br>Google News RSS]
+        Feature3[<b>Sentiment Analysis</b><br>Hugging Face FinBERT]
+        Feature4[<b>Predictive Modeling</b><br>ARIMA + Holt-Winters]
+        Feature5[<b>Report Generation</b><br>Google Gemini LLM]
+    end
+
+    %% --- Data Flow ---
+    User -- "1.Enters Ticker" --> Frontend
+    Frontend -- "2.API Request" --> API
+    API -- "3.Triggers Core Logic" --> Engine
+
+    Engine -- "4.Gathers &amp; Processes Data" --> Aggregation
+    Aggregation --> Feature1
+    Aggregation --> Feature2
+    Aggregation --> Feature3
+
+    Engine -- "5.Runs Internal Models" --> Feature4
+    Engine -- "6.Synthesizes All Data" --> Feature5
+
+    Engine -- "7.Returns Final Report" --> API
+    API -- "8.Sends Response to Frontend" --> Frontend
+    Frontend -- "9.Displays Report &amp; Chart" --> User
+
+    %% --- Styling ---
+    style User fill:#cde4ff,stroke:#333
+    style Frontend fill:#d3e3fd,stroke:#333,stroke-width:2px
+    style API fill:#d5fdd3,stroke:#333,stroke-width:2px
+    style Engine fill:#a2f59d,stroke:#333,stroke-width:2px
+    style Aggregation fill:#fdf7d3,stroke:#333,stroke-width:1.5px
+    style Feature1 fill:#ffe8d6,stroke:#333
+    style Feature2 fill:#ffe8d6,stroke:#333
+    style Feature3 fill:#ffe8d6,stroke:#333
+    style Feature4 fill:#fff2d6,stroke:#333
+    style Feature5 fill:#ffe8d6,stroke:#333
+
 ```
 
 ---
