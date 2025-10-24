@@ -398,29 +398,29 @@ export function Chat() {
 
   return (
     <div className="relative">
-      <Card className="w-full h-[85vh] grid grid-rows-[auto,1fr,auto] backdrop-blur-sm bg-card border-border shadow-2xl rounded-2xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-white/90 to-white/70 backdrop-blur-sm border-b border-white/30 p-6">
-          <div className="flex items-center gap-4">
+      <Card className="w-full h-[75vh] sm:h-[80vh] lg:h-[85vh] grid grid-rows-[auto,1fr,auto] backdrop-blur-sm bg-card border-border shadow-lg lg:shadow-2xl rounded-xl lg:rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-card to-card/90 backdrop-blur-sm border-b border-border p-3 sm:p-4 lg:p-6">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
             <div className="relative">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
-                <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-white flex items-center justify-center">
-                <div className="h-2 w-2 rounded-full bg-white animate-pulse"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 h-3 w-3 sm:h-4 sm:w-4 rounded-full bg-green-500 border-2 border-white flex items-center justify-center">
+                <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-white animate-pulse"></div>
               </div>
             </div>
-            <div>
-              <CardTitle className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">InsightInvest AI Analyst</CardTitle>
-              <CardDescription className="text-gray-600">Advanced financial analysis powered by artificial intelligence</CardDescription>
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-sm sm:text-lg lg:text-xl font-bold text-foreground">InsightInvest AI Analyst</CardTitle>
+              <CardDescription className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Advanced financial analysis powered by artificial intelligence</CardDescription>
             </div>
           </div>
         </CardHeader>
         
-        <CardContent className="h-full overflow-hidden bg-gradient-to-b from-slate-50/50 to-white/50 p-0">
+        <CardContent className="h-full overflow-hidden bg-background/50 p-0">
           <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
+            <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
               {messages.length === 0 && (
                 <div className="flex items-center justify-center h-full py-20">
                   <div className="text-center max-w-md">
@@ -467,19 +467,19 @@ export function Chat() {
           </ScrollArea>
         </CardContent>
         
-        <div className="bg-gradient-to-r from-white/95 to-white/90 backdrop-blur-sm border-t border-white/30 p-6">
+        <div className="bg-card/95 backdrop-blur-sm border-t border-border p-3 sm:p-4 lg:p-6">
           <form onSubmit={handleSubmit} aria-label="Analyze company form">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
               <div className="relative flex-1">
                 <Input
                   value={input}
-                  placeholder="Enter stock ticker (e.g., AAPL, MSFT, GOOGL)..."
+                  placeholder="Enter ticker (AAPL, RELIANCE.NS)..."
                   onChange={(e) => setInput(e.target.value)}
                   disabled={isLoading}
-                  className="pl-12 pr-4 py-3 text-base rounded-xl border-border bg-background/80 backdrop-blur-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-200 placeholder:text-muted-foreground"
+                  className="pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl border-border bg-background/80 backdrop-blur-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-200 placeholder:text-muted-foreground"
                 />
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2">
+                  <svg className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
@@ -487,32 +487,32 @@ export function Chat() {
               <Button 
                 type="submit" 
                 disabled={isLoading || !input.trim()} 
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 {isLoading ? (
                   <>
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                     </svg>
-                    Analyzing...
+                    <span className="hidden sm:inline text-sm sm:text-base">Analyzing...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Analyze
+                    <span className="hidden sm:inline text-sm sm:text-base">Analyze</span>
                   </>
                 )}
               </Button>
             </div>
             {inputError && (
-              <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
-                <svg className="h-4 w-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mt-2 sm:mt-3 p-2.5 sm:p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-center gap-2">
+                <svg className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm text-red-700">{inputError}</span>
+                <span className="text-xs sm:text-sm text-red-700 dark:text-red-400">{inputError}</span>
               </div>
             )}
           </form>

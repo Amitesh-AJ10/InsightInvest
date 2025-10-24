@@ -7,22 +7,22 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-grow mx-auto w-full max-w-7xl px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          <section className="lg:col-span-1">
-            <div className="sticky top-8">
-              <div className="group relative overflow-hidden rounded-2xl bg-card backdrop-blur-sm border border-border p-8 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+      <main className="flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 py-4 sm:py-8">
+        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-8 items-start">
+          <section className="w-full lg:col-span-1 order-2 lg:order-1">
+            <div className="lg:sticky lg:top-8">
+              <div className="group relative overflow-hidden rounded-xl lg:rounded-2xl bg-card backdrop-blur-sm border border-border p-4 sm:p-6 lg:p-8 shadow-lg lg:shadow-xl hover:shadow-xl lg:hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
-                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
-                    <h1 className="text-2xl font-bold text-foreground">AI Investment Analyst</h1>
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">AI Investment Analyst</h1>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed mb-6">Get comprehensive investment reports, market sentiment analysis, and AI-powered price forecasts for any stock ticker.</p>
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-4 sm:mb-6">Get comprehensive investment reports, market sentiment analysis, and AI-powered price forecasts for any stock ticker.</p>
 
                   <div className="space-y-4">
                     <div>
@@ -129,7 +129,7 @@ export default function Home() {
               </div>
             </div>
           </section>
-          <section className="lg:col-span-3">
+          <section className="w-full lg:col-span-3 order-1 lg:order-2">
             <Chat />
           </section>
         </div>
