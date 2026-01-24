@@ -37,6 +37,7 @@ numpy==2.3.3
 packaging==25.0
 pandas==2.3.3
 patsy==1.0.1
+peewee==3.19.0
 pillow==11.3.0
 platformdirs==4.5.0
 proto-plus==1.26.1
