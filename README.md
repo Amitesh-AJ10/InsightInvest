@@ -8,23 +8,23 @@
 
 ## 🚀 Core Features
 
-- **🤖 Conversational Interface:**  
-  Simply enter a company name or stock ticker (e.g., "Nvidia", "AAPL", "RELIANCE.NS") to begin the analysis.
+- **🤖 Conversational Interface:**
+  Simply enter a stock ticker (e.g., "Nvidia", "AAPL", "RELIANCE.NS") to begin the analysis.
 
-- **🌐 Dynamic Web Research:**  
-  Gathers real-time news articles and press releases from Google News to gauge market perception.
+- **🌐 Dynamic Web Research:**
+  Gathers real-time news headlines via Google News RSS feeds to gauge immediate market perception without heavy scraping overhead.
 
-- **📊 Quantitative Financial Analysis:**  
+- **📊 Quantitative Financial Analysis:**
   Integrates with the Yahoo Finance API to fetch and interpret key financial metrics like P/E Ratio, EPS, Debt-to-Equity, and revenue trends.
 
-- **🧠 Advanced Sentiment Analysis:**  
-  Uses the FinBERT model, specialized for financial text, to perform nuanced sentiment analysis on news headlines, assessing if the market sentiment is positive, negative, or neutral.
+- **🧠 Advanced Sentiment Analysis:**
+  Uses Groq's high-speed inference (Llama 3) to analyze financial news headlines in parallel, rapidly assessing if the global market sentiment is positive, negative, or neutral.
 
-- **🔮 AI-Powered Predictive Modeling:**  
+- **🔮 AI-Powered Predictive Modeling:**
   Employs a sophisticated hybrid forecasting model (ARIMA + Holt-Winters) and fuses it with the news sentiment score to predict potential future stock price movements, complete with a visual chart and confidence intervals.
 
-- **📝 Comprehensive Report Generation:**  
-  Leverages Google's Gemini LLM to synthesize all the gathered qualitative and quantitative data into a coherent, professional, and easy-to-read investment report.
+- **📝 Comprehensive Report Generation:**
+  Leverages Groq's Llama 3 LLM to synthesize all gathered qualitative and quantitative data into a coherent, professional, and easy-to-read investment report.
 
 ---
 
@@ -36,7 +36,7 @@ The project is a monorepo containing a separate frontend and backend, ensuring a
 | --------- | --------------------------------- |
 | Frontend  | Next.js, React, TypeScript, Tailwind CSS |
 | Backend   | Python, FastAPI (API), Gunicorn (production) |
-| AI & Data | Google Gemini (Report Generation), Hugging Face FinBERT (Sentiment), yfinance (Financial Data), Statsmodels (Forecasting) |
+| AI & Data | Groq LPU (Llama 3) (Report & Sentiment), yfinance (Financial Data), Google News RSS, Statsmodels (Forecasting)
 
 ### System Architecture
 
@@ -46,16 +46,18 @@ graph TD
     B --> C{FastAPI Backend on Render}
     C --> D[Yahoo Finance API]
     C --> E[Google News RSS]
-    E --> F[Hugging Face API - FinBERT]
+
     subgraph "Data Synthesis & Analysis"
         direction LR
         D[Stock Data & Metrics] --> G{Forecasting Model}
-        F[Sentiment Score] --> G
-        G[Forecast Output] --> H{Gemini LLM}
+        E[News Headlines] --> H{Groq LPU (Llama 3)}
+        H -->|Sentiment Analysis| I[Sentiment Score]
+        I --> G
+        G[Forecast Output] --> H
         D --> H
-        F --> H
     end
-    H --> C
+
+    H -->|Investment Report| C
     C --> B
     B --> A
 ```
@@ -81,16 +83,14 @@ cd InsightInvest
 
 ### 2. Set Up Environment Variables
 
-The project requires API keys for Alpha Vantage, Google Gemini, and Hugging Face.
+The project requires API key for Groq (which handles both sentiment and reporting).
 
 Create a file named `.env` in the backend folder.
 Open `.env` and add your API keys:
 
 ```env
 # .env
-ALPHA_VANTAGE_API_KEY=alpha_vantage_api_key_here
-GEMINI_API_KEY=gemini_api_key_here
-HF_API_KEY=hugging_face_api_key_here
+GROQ_API_KEY=gsk_your_key_here_1, gsk_your_key_here_2
 ```
 
 ### 3. Backend Setup (FastAPI)
