@@ -42,18 +42,18 @@ The project is a monorepo containing a separate frontend and backend, ensuring a
 
 ```mermaid
 graph TD
-    A[User] --> B{Next.js Frontend on Vercel}
-    B --> C{FastAPI Backend on Render}
-    C --> D[Yahoo Finance API]
-    C --> E[Google News RSS]
+    A[User] --> B{"Next.js Frontend on Vercel"}
+    B --> C{"FastAPI Backend on Render"}
+    C --> D["Yahoo Finance API"]
+    C --> E["Google News RSS"]
 
     subgraph "Data Synthesis & Analysis"
         direction LR
-        D[Stock Data & Metrics] --> G{Forecasting Model}
-        E[News Headlines] --> H{Groq LPU (Llama 3)}
-        H -->|Sentiment Analysis| I[Sentiment Score]
+        D["Stock Data & Metrics"] --> G{"Forecasting Model"}
+        E["News Headlines"] --> H{"Groq LPU (Llama 3)"}
+        H -->|Sentiment Analysis| I["Sentiment Score"]
         I --> G
-        G[Forecast Output] --> H
+        G["Forecast Output"] --> H
         D --> H
     end
 
